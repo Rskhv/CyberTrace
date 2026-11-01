@@ -1,0 +1,10 @@
+msfadmin
+password
+123456
+root
+toor
+admin
+user
+test
+service
+postgres

@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CyberTrace | Forensic Overview</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><header><a class="brand" href="/">CYBERTRACE <span>FORENSICS</span></a><nav><a href="/">Overview</a><a href="/incidents">Incidents</a></nav></header>
+<main><section class="hero"><p class="eyebrow">NETWORK FORENSICS / OVERVIEW</p><h1>Incident observability</h1><p>Review detections, evidence, and reconstructed attack sequences.</p></section>
+{% if not snapshot.available %}<div class="notice">Database not found at <code>{{ snapshot.database }}</code>. Set <code>CYBERTRACE_DB</code> to the shared SQLite database.</div>{% endif %}
+<section class="metrics">{% for key,label in [('packets','Packets'),('flows','Flows'),('events','Detected events'),('incidents','Incidents')] %}<article class="metric"><span>{{ label }}</span><strong>{{ snapshot.counts[key] }}</strong></article>{% endfor %}</section>
+<section class="panel"><div class="panel-head"><div><p class="eyebrow">CASE QUEUE</p><h2>Recent incidents</h2></div><a href="/incidents">View all →</a></div>
+{% if snapshot.incidents %}<div class="table-wrap"><table><thead><tr><th>Incident</th><th>Window</th><th>Confidence</th><th>Status</th></tr></thead><tbody>{% for i in snapshot.incidents %}<tr><td><a href="/incident/{{ i.get('incident_id', i.get('id','')) }}">#{{ i.get('incident_id', i.get('id','—')) }}</a></td><td>{{ i.get('start_time_display', i.get('start_time','—')) }} → {{ i.get('end_time_display', i.get('end_time','—')) }}</td><td>{{ i.get('confidence_score', i.get('confidence','—')) }}</td><td><span class="badge correlated">{{ i.get('status','CORRELATED') }}</span></td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty">No incident rows are available yet.</p>{% endif %}</section></main></body></html>

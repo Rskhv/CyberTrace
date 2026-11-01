@@ -1,0 +1,38 @@
+# CyberTrace — Attack Range lab config (EXAMPLE).
+# Copy to attack_range/config.yaml and edit the IPs/interface for your lab.
+# All attacks are confined to `lab.subnet`; the orchestrator refuses to run
+# if the target/attacker are outside it or if the host can reach the internet.
+
+lab:
+  subnet: "10.10.10.0/24"      # isolated host-only / internal network
+  attacker_ip: "10.10.10.5"    # Kali attacker VM
+  target_ip: "10.10.10.20"     # Metasploitable2 target VM
+  monitor_iface: "eth1"        # interface tshark captures on
+  probe_internet: true         # verify the host CANNOT reach the internet
+  strict_isolation: true       # abort the run if isolation checks fail
+
+output:
+  artifacts_dir: "artifacts"           # run folders, ground-truth log, tool logs
+  pcap_dir: "artifacts/pcaps"          # SHARED: Detection Pipeline reads PCAPs here
+
+scenarios:
+  recon:
+    enabled: true
+    ports: "1-1024"                    # port range for the SYN scan
+    nmap_extra: ["-sS", "-sV", "-T4"]  # SYN scan + service/version detection
+    timeout_s: 600
+
+  ssh_bruteforce:
+    enabled: true
+    port: 22
+    username: "msfadmin"
+    wordlist: "attack_range/wordlists/lab_ssh.txt"
+    hydra_tasks: 4
+    timeout_s: 300
+
+  exploit:
+    enabled: true
+    port: 21
+    msf_module: "exploit/unix/ftp/vsftpd_234_backdoor"
+    payload: ""                        # module provides its own session; leave blank
+    timeout_s: 180
