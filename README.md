@@ -83,8 +83,11 @@ Set `CYBERTRACE_SECRET_KEY` to a generated random secret before deployment. Set 
 OpenSSH authentication logs are ingested independently of packet parsing:
 
 ~~~sh
+
+
 python -m security.ingest_ssh --db data/cybertrace.db --auth-log /var/log/auth.log --target-host ubuntu-ssh
 python -m security.ingest_ssh --db data/cybertrace.db --jsonl fixtures/ssh-events.jsonl
+
 ~~~
 
 The auth.log command uses an incremental cursor and handles file replacement/truncation; JSONL is idempotent by event fingerprint. Actual SSH brute-force alerts require host authentication failure evidence. Port 22 PCAP bursts are labeled `SSH_CONNECTION_ANOMALY`.
