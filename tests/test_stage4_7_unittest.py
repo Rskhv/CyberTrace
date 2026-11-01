@@ -5,10 +5,10 @@ from datetime import datetime, timezone, timedelta
 from cybertrace_forensics.incident import build_incidents
 from cybertrace_forensics.inference import InferredEvent
 from cybertrace_forensics.models import Event
-from test_baseline import test_baseline_correlates_related_events, test_baseline_rejects_distant_events
-from test_inference import test_missing_service_discovery_is_inferred
-from test_forensics_pipeline import test_pipeline_runs
-from test_scoring import test_strong_correlation, test_scores_are_bounded
+from .test_baseline import test_baseline_correlates_related_events, test_baseline_rejects_distant_events
+from .test_inference import test_missing_service_discovery_is_inferred
+from .test_forensics_pipeline import test_pipeline_runs
+from .test_scoring import test_strong_correlation, test_scores_are_bounded
 
 
 class SuppliedStage47Tests(unittest.TestCase):

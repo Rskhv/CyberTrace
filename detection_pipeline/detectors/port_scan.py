@@ -25,14 +25,19 @@ def detect_port_scans(packets: List[PacketRecord], config: DetectorConfig
     cfg = config
     events: List[NormalizedEvent] = []
 
-    # Group SYN initiations by (source_ip, destination_ip) — a scan targets one
-    # host across many ports.
+    # Count observable probes across TCP flag variants and UDP. Long-window
+    # evaluation catches slower sweeps; thresholds remain deliberately high.
     by_pair: Dict[tuple, List[PacketRecord]] = defaultdict(list)
     for p in packets:
-        if is_pure_syn(p) and p.source_ip and p.destination_ip and p.destination_port is not None:
-            by_pair[(p.source_ip, p.destination_ip)].append(p)
+        if not (p.source_ip and p.destination_ip and p.destination_port is not None):
+            continue
+        flags = p.tcp_flags.upper().replace(" ", "") if p.tcp_flags is not None else None
+        unusual_tcp = p.protocol == "TCP" and (is_pure_syn(p) or flags in {"FIN", "", "FIN,PSH,URG"})
+        udp_probe = p.protocol == "UDP"
+        if unusual_tcp or udp_probe:
+            by_pair[(p.source_ip, p.destination_ip, p.protocol)].append(p)
 
-    for (src, dst), pkts in by_pair.items():
+    for (src, dst, protocol), pkts in by_pair.items():
         pkts.sort(key=lambda x: x.timestamp)
 
         # Sliding time window (two pointers) to find the window with the most
@@ -54,6 +59,23 @@ def detect_port_scans(packets: List[PacketRecord], config: DetectorConfig
                     best = (distinct, syn_count, pkts[left].timestamp,
                             pkts[right].timestamp, left, right)
 
+        # A separate long window catches slow scans that stay below the short
+        # threshold. It still requires breadth across destination ports.
+        if best is None and cfg.scan_long_window_seconds > cfg.scan_window_seconds:
+            left = 0
+            ports_seen: Dict[int, int] = defaultdict(int)
+            long_best = None
+            for right, packet in enumerate(pkts):
+                ports_seen[packet.destination_port] += 1
+                while packet.timestamp - pkts[left].timestamp > cfg.scan_long_window_seconds:
+                    ports_seen[pkts[left].destination_port] -= 1
+                    if not ports_seen[pkts[left].destination_port]:
+                        del ports_seen[pkts[left].destination_port]
+                    left += 1
+                if len(ports_seen) >= cfg.scan_long_min_distinct_ports and (long_best is None or len(ports_seen) > long_best[0]):
+                    long_best = (len(ports_seen), right-left+1, pkts[left].timestamp, packet.timestamp, left, right)
+            best = long_best
+
         if best is None:
             continue
 
@@ -71,7 +93,7 @@ def detect_port_scans(packets: List[PacketRecord], config: DetectorConfig
             timestamp=win_start,
             source_ip=src,
             destination_ip=dst,
-            protocol="TCP",
+            protocol=protocol,
             event_type="PORT_SCAN",
             attack_stage="RECON",
             evidence_source="PCAP",
@@ -91,6 +113,8 @@ def detect_port_scans(packets: List[PacketRecord], config: DetectorConfig
                 "window_end_utc": iso_utc(win_end),
                 "ports_sample": ports[:50],
                 "target": dst,
+                "scan_window_type": "short" if win_end-win_start <= cfg.scan_window_seconds else "long",
+                "probe_type": "UDP" if protocol == "UDP" else "TCP flag/connection probes",
             },
         ))
 

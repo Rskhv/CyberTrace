@@ -18,7 +18,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import List, Optional
 
-SCHEMA_VERSION = "2.0.0"  # Stage 1 canonical model
+SCHEMA_VERSION = "2.1.0"  # add explicit network SSH anomaly vocabulary
 
 # -- Controlled vocabularies -------------------------------------------------
 
@@ -26,6 +26,11 @@ SCHEMA_VERSION = "2.0.0"  # Stage 1 canonical model
 EVENT_TYPES = (
     "PORT_SCAN",
     "SSH_BRUTE_FORCE",
+    "SSH_CONNECTION_ANOMALY",
+    "SSH_SUSPICIOUS_SUCCESS",
+    "AUTHORIZED_RECONNAISSANCE",
+    "UNAUTHORIZED_RECONNAISSANCE",
+    "AUTHORIZATION_VIOLATION",
     "EXPLOITATION",
 )
 
@@ -51,7 +56,7 @@ EVENT_STATUSES = (
 SEVERITIES = ("INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL")
 
 # Where the evidence behind the event came from.
-EVIDENCE_SOURCES = ("PCAP", "GROUND_TRUTH")
+EVIDENCE_SOURCES = ("PCAP", "GROUND_TRUTH", "HOST_AUTH_LOG")
 
 PROTOCOLS = ("TCP", "UDP", "ICMP", "OTHER")
 
@@ -61,6 +66,11 @@ PROTOCOLS = ("TCP", "UDP", "ICMP", "OTHER")
 EVENT_TYPE_TO_STAGE = {
     "PORT_SCAN": "RECON",
     "SSH_BRUTE_FORCE": "CREDENTIAL_ATTACK",
+    "SSH_CONNECTION_ANOMALY": "SERVICE_DISCOVERY",
+    "SSH_SUSPICIOUS_SUCCESS": "CREDENTIAL_ATTACK",
+    "AUTHORIZED_RECONNAISSANCE": "RECON",
+    "UNAUTHORIZED_RECONNAISSANCE": "RECON",
+    "AUTHORIZATION_VIOLATION": "RECON",
     "EXPLOITATION": "EXPLOITATION",
 }
 

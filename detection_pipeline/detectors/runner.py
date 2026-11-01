@@ -21,7 +21,15 @@ from .ssh_brute_force import detect_ssh_brute_force
 from .exploitation import detect_exploitation
 
 # Ordered recon -> credential -> exploitation (the lifecycle order).
-DETECTORS = (detect_port_scans, detect_ssh_brute_force, detect_exploitation)
+DETECTORS = [detect_port_scans, detect_ssh_brute_force, detect_exploitation]
+
+
+def register_detector(detector) -> None:
+    """Register an additional rule with the common (packets, config) contract."""
+    if not callable(detector):
+        raise TypeError("detector must be callable")
+    if detector not in DETECTORS:
+        DETECTORS.append(detector)
 
 
 def detect(packets, config: Optional[DetectorConfig] = None) -> List[NormalizedEvent]:

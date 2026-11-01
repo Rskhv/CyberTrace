@@ -24,6 +24,8 @@ import argparse
 import json
 import os
 import sqlite3
+import time
+from pathlib import Path
 from typing import List, Optional
 
 try:
@@ -50,8 +52,24 @@ def init_db(db_path: str, schema_path: str = SCHEMA_PATH) -> sqlite3.Connection:
         ddl = fh.read()
     conn = connect(db_path)
     conn.executescript(ddl)
+    apply_migrations(conn)
     conn.commit()
     return conn
+
+
+def apply_migrations(conn: sqlite3.Connection, migrations_dir: str | None = None) -> None:
+    """Apply ordered, additive SQL migrations exactly once."""
+    root = Path(migrations_dir) if migrations_dir else Path(__file__).with_name("migrations")
+    conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at REAL NOT NULL)")
+    applied = {int(row[0]) for row in conn.execute("SELECT version FROM schema_migrations")}
+    for path in sorted(root.glob("[0-9]*.sql")):
+        version = int(path.name.split("_", 1)[0])
+        if version in applied:
+            continue
+        # executescript commits implicitly; migration DDL is idempotent and the
+        # version is written only after all statements complete successfully.
+        conn.executescript(path.read_text(encoding="utf-8"))
+        conn.execute("INSERT INTO schema_migrations(version,applied_at) VALUES (?,?)", (version, time.time()))
 
 
 # -- packets -----------------------------------------------------------------

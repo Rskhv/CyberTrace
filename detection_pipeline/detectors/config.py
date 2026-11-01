@@ -21,6 +21,8 @@ class DetectorConfig:
     min_distinct_ports: int = 15
     min_syn_count: int = 15
     scan_window_seconds: float = 10.0
+    scan_long_window_seconds: float = 86400.0
+    scan_long_min_distinct_ports: int = 25
 
     # -- SSH brute-force detector -------------------------------------------
     # A source making at least SSH_MIN_ATTEMPTS connection attempts to the SSH
