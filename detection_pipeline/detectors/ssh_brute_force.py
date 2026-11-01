@@ -1,12 +1,10 @@
 """
-Stage 3 detector 2 — SSH BRUTE FORCE (credential attack).
+Stage 3 detector 2 — SSH CONNECTION ANOMALY (network metadata only).
 
-Signal: one source opens many short-lived connections to the SSH port in a
-short window — the shape a Hydra dictionary attack leaves. Connection attempts
-are counted as SYN initiations to the SSH port; session duration comes from the
-flows built out of the same packets.
+Repeated SYNs to port 22 show connection activity only. They cannot establish
+authentication failures because SSH payloads are encrypted.
 
-Emits: event_type=SSH_BRUTE_FORCE, attack_stage=CREDENTIAL_ATTACK, status=DETECTED.
+Emits: event_type=SSH_CONNECTION_ANOMALY, attack_stage=SERVICE_DISCOVERY.
 """
 
 from __future__ import annotations
@@ -74,8 +72,8 @@ def detect_ssh_brute_force(packets: List[PacketRecord], config: DetectorConfig
             source_ip=src,
             destination_ip=dst,
             protocol="TCP",
-            event_type="SSH_BRUTE_FORCE",
-            attack_stage="CREDENTIAL_ATTACK",
+            event_type="SSH_CONNECTION_ANOMALY",
+            attack_stage="SERVICE_DISCOVERY",
             evidence_source="PCAP",
             source_port=None,
             destination_port=cfg.ssh_port,
@@ -93,6 +91,7 @@ def detect_ssh_brute_force(packets: List[PacketRecord], config: DetectorConfig
                 "total_ssh_sessions": len(durations),
                 "ssh_port": cfg.ssh_port,
                 "target": dst,
+                "limitation": "PCAP connection counts cannot establish SSH authentication failures",
             },
         ))
 

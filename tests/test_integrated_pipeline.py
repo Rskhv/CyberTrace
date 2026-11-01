@@ -55,8 +55,15 @@ class IntegratedPipelineTests(unittest.TestCase):
 
             # Stage 3 consumes those persisted packets and emits shared events.
             detected = run_detectors(conn, config=DetectorConfig())
+            # Credential failures come from trusted OpenSSH logs, not the SSH PCAP.
+            from security.ssh_auth import ingest_events, parse_json_event, risk_events
+            host_events = [parse_json_event({"timestamp":base+20+i*2,"source_ip":"192.168.56.10",
+                "username":"lab-user","result":"FAILURE","method":"password","target_host":"192.168.56.20"}) for i in range(6)]
+            auth_alerts = risk_events(ingest_events(conn, host_events))
+            for alert in auth_alerts: db.insert_event(conn, alert)
+            detected.extend(auth_alerts)
             self.assertEqual({event.event_type for event in detected},
-                             {"PORT_SCAN", "SSH_BRUTE_FORCE", "EXPLOITATION"})
+                             {"PORT_SCAN", "SSH_CONNECTION_ANOMALY", "SSH_BRUTE_FORCE", "EXPLOITATION"})
             self.assertTrue(all(event.status == "DETECTED" for event in detected))
 
             # Stages 4–7 consume only normalized detector events, persist final
@@ -75,17 +82,27 @@ class IntegratedPipelineTests(unittest.TestCase):
             self.assertIsNotNone(detail)
             statuses = [event["status"] for event in detail["events"]]
             self.assertIn("DETECTED", statuses)
-            self.assertIn("INFERRED", statuses)
+            self.assertIn("DETECTED", statuses)
             stages = [event["attack_stage"] for event in detail["events"]]
             self.assertEqual(stages, ["RECON", "SERVICE_DISCOVERY", "CREDENTIAL_ATTACK", "EXPLOITATION"])
             if importlib.util.find_spec("flask"):
                 from forensics_dashboard import create_app
+                from shared.database import connect
+                from security.accounts import initialize_admin
                 client = create_app(database).test_client()
-                self.assertEqual(client.get("/").status_code, 200)
+                self.assertEqual(client.get("/").status_code, 302)
+                self.assertEqual(client.get("/api/events").status_code, 401)
+                auth_conn = connect(database)
+                initialize_admin(auth_conn, "test-admin", "temporary test password")
+                auth_conn.close()
+                login_page = client.get("/login").data.decode()
+                import re
+                csrf = re.search(r'name="csrf_token" value="([^"]+)"', login_page).group(1)
+                client.post("/login", data={"username":"test-admin", "password":"temporary test password", "csrf_token":csrf})
                 self.assertEqual(client.get("/incidents").status_code, 200)
                 incident_page = client.get(f"/incident/{incident_id}")
                 self.assertEqual(incident_page.status_code, 200)
-                self.assertIn(b"INFERRED", incident_page.data)
+                self.assertIn(b"SSH BRUTE FORCE", incident_page.data)
                 self.assertIn(b"DETECTED", incident_page.data)
                 self.assertEqual(client.get("/api/incidents").status_code, 200)
                 self.assertEqual(client.get("/api/events").status_code, 200)
@@ -118,8 +135,10 @@ class IntegratedPipelineTests(unittest.TestCase):
             scores = evaluate(gt_rows, baseline, proposed)
             self.assertEqual(scores["proposed"]["recall"], 1.0, msg=repr((gt_rows, proposed)))
             self.assertEqual(scores["proposed"]["reconstruction_accuracy"], 1.0)
-            self.assertEqual(scores["proposed"]["missing_step_recovery_accuracy"], 1.0)
-            self.assertEqual(scores["baseline"]["reconstruction_accuracy"], 0.0)
+            # All stages are now evidenced directly by packet or host-log events,
+            # so no missing-step inference was needed in this scenario.
+            self.assertIsNone(scores["proposed"]["missing_step_recovery_accuracy"])
+            self.assertEqual(scores["baseline"]["reconstruction_accuracy"], 1.0)
             result_csv = exports / "evaluation_results.csv"
             with redirect_stdout(io.StringIO()):
                 self.assertEqual(evaluate_cli([

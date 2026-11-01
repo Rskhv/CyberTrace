@@ -68,6 +68,37 @@ python -m forensics_dashboard.evaluation --ground-truth artifacts/run-<timestamp
 
 The JSONL input is read only by this evaluation command. If the database contains packets from a capture whose filename includes baseline, the evaluator derives its benign time window from those packet rows. It reports precision, recall, F1, false-positive rate when benign labels exist, timeline reconstruction accuracy, missing-step recovery, detection latency, optional PCAP parsing accuracy, and SQLite read-query time. Parsing accuracy can be added with --parsing-total N --parsing-correct M, using an independent tshark packet/field comparison. Missing measurements are left blank rather than fabricated.
 
+## Security services
+
+Schema migrations run additively when `shared.database.init_db()` initializes a database. Existing packets, flows, alerts, incidents and correlations are retained. For an existing database, use the regular pipeline or dashboard startup once to apply migrations.
+
+Initialize the first dashboard administrator interactively (no default password is supplied):
+
+~~~sh
+python -m security.setup_admin --db data/cybertrace.db --username admin
+~~~
+
+Set `CYBERTRACE_SECRET_KEY` to a generated random secret before deployment. Set `CYBERTRACE_COOKIE_SECURE=1` only when the dashboard is served through HTTPS. The Flask development server remains HTTP. The dashboard requires login; roles and permissions are checked server-side. `/security` and `/api/security/*` expose role-filtered security views.
+
+OpenSSH authentication logs are ingested independently of packet parsing:
+
+~~~sh
+python -m security.ingest_ssh --db data/cybertrace.db --auth-log /var/log/auth.log --target-host ubuntu-ssh
+python -m security.ingest_ssh --db data/cybertrace.db --jsonl fixtures/ssh-events.jsonl
+~~~
+
+The auth.log command uses an incremental cursor and handles file replacement/truncation; JSONL is idempotent by event fingerprint. Actual SSH brute-force alerts require host authentication failure evidence. Port 22 PCAP bursts are labeled `SSH_CONNECTION_ANOMALY`.
+
+Create an Ed25519 administrator key and sign a scan manifest:
+
+~~~sh
+python -m security.authorize_scan keygen --private secrets/admin-ed25519.pem --public secrets/admin-ed25519.pub
+python -m security.authorize_scan authorize --private secrets/admin-ed25519.pem --signer-id lab-admin --scanner-id kali-lab --target 192.168.56.20 --subnet 192.168.56.0/24 --ports 22,80 --protocols TCP --scan-types SYN,CONNECT --environment lab --output artifacts/scan-auth.json
+python -m security.scanner_agent --authorization artifacts/scan-auth.json --public-key secrets/admin-ed25519.pub --scanner-id kali-lab --target 192.168.56.20 --ports 22,80 --scan-type SYN --replay-db data/scanner-replay.db --dry-run
+~~~
+
+Use AES-GCM evidence envelopes and Ed25519 evidence manifests from `security.crypto`; key loading and generation helpers are in `security.key_management`. Standard SQLite and existing evidence files remain plaintext unless the operator explicitly encrypts them. See [the security architecture](docs/SECURITY_ARCHITECTURE.md), [the demo guide](docs/DEMONSTRATION_GUIDE.md), and other docs in `docs/` for deployment and limits. Live firewall action remains opt-in, Linux-only, lab-scoped and dry-run by default.
+
 ## Tests
 
 ~~~sh

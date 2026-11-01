@@ -1,3 +1,4 @@
 Flask>=3.0,<4.0
 PyYAML>=6.0
 pyshark>=0.6
+cryptography>=42,<47

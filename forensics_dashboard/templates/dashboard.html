@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CyberTrace | Forensic Overview</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
-<body><header><a class="brand" href="/">CYBERTRACE <span>FORENSICS</span></a><nav><a href="/">Overview</a><a href="/incidents">Incidents</a></nav></header>
+<body><header><a class="brand" href="/">CYBERTRACE <span>FORENSICS</span></a><nav><a href="/">Overview</a><a href="/incidents">Incidents</a><a href="/security">Security</a><span>{{ username }}</span><form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Sign out</button></form></nav></header>
 <main><section class="hero"><p class="eyebrow">NETWORK FORENSICS / OVERVIEW</p><h1>Incident observability</h1><p>Review detections, evidence, and reconstructed attack sequences.</p></section>
 {% if not snapshot.available %}<div class="notice">Database not found at <code>{{ snapshot.database }}</code>. Set <code>CYBERTRACE_DB</code> to the shared SQLite database.</div>{% endif %}
 <section class="metrics">{% for key,label in [('packets','Packets'),('flows','Flows'),('events','Detected events'),('incidents','Incidents')] %}<article class="metric"><span>{{ label }}</span><strong>{{ snapshot.counts[key] }}</strong></article>{% endfor %}</section>

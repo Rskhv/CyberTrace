@@ -65,7 +65,9 @@ class TestPortScan(unittest.TestCase):
         # 40 ports but spread over 400s — not within scan_window_seconds.
         pkts = [tcp(100.0 + i * 10.0, "10.0.0.5", "10.0.0.9", 50000 + i, p, pid=i + 1)
                 for i, p in enumerate(range(1, 41))]
-        self.assertEqual(detect_port_scans(pkts, CFG), [])
+        events = detect_port_scans(pkts, CFG)
+        self.assertEqual(len(events), 1)  # the configured 24-hour window catches slow sweeps
+        self.assertEqual(events[0].evidence["scan_window_type"], "long")
 
 
 class TestSshBruteForce(unittest.TestCase):
@@ -75,8 +77,8 @@ class TestSshBruteForce(unittest.TestCase):
         events = detect_ssh_brute_force(pkts, CFG)
         self.assertEqual(len(events), 1)
         e = events[0]
-        self.assertEqual(e.event_type, "SSH_BRUTE_FORCE")
-        self.assertEqual(e.attack_stage, "CREDENTIAL_ATTACK")
+        self.assertEqual(e.event_type, "SSH_CONNECTION_ANOMALY")
+        self.assertEqual(e.attack_stage, "SERVICE_DISCOVERY")
         self.assertEqual(e.destination_port, 22)
         self.assertGreaterEqual(e.evidence["attempts"], CFG.ssh_min_attempts)
         self.assertTrue(0.0 <= e.evidence_score <= 1.0)
@@ -146,7 +148,7 @@ class TestRunnerAndStorage(unittest.TestCase):
             events = run_detectors(conn, config=CFG, store=True)
 
             types = {e.event_type for e in events}
-            self.assertEqual(types, {"PORT_SCAN", "SSH_BRUTE_FORCE", "EXPLOITATION"})
+            self.assertEqual(types, {"PORT_SCAN", "SSH_CONNECTION_ANOMALY", "EXPLOITATION"})
 
             # alerts persisted, with evidence JSON round-tripping
             rows = conn.execute("SELECT event_type, evidence_score, evidence FROM alerts").fetchall()
